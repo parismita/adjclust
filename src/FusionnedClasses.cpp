@@ -61,8 +61,9 @@ void FusionnedClasses::InitializeFusionCost()
     FusionCost = -1;
   else
     {
+      //as ai = aj = 0.5 and beta = 0 and gamma = -0.5
       double Coefficient = 0.5;
-      FusionCost = Coefficient * (MyMatrix->Value(MyIndex, MyIndex) +  MyMatrix->Value(MyIndex + 1, MyIndex + 1) - 2 * MyMatrix->Value(MyIndex, MyIndex + 1));
+      FusionCost = Coefficient * [MyMatrix->Value(MyIndex, MyIndex) +  MyMatrix->Value(MyIndex + 1, MyIndex + 1) - abs(MyMatrix->Value(MyIndex, MyIndex) -  MyMatrix->Value(MyIndex + 1, MyIndex + 1))];
     }
 }
 
@@ -98,11 +99,8 @@ void FusionnedClasses::ComputeMyFusionCost()
       FusionCost = -1;
       return;
     }
-  double a = MyCardinal();
-  double b = MyMatrix->MyClasses[NextAvailableIndex].MyCardinal();
-  double Coefficient = (a * b) / (a + b);
-  
-  FusionCost = Coefficient * (MyValue() / (a * a)  - 2 * MyMatrix->Value(MyIndex, NextAvailableIndex) / (a * b) + MyMatrix->Value(NextAvailableIndex, NextAvailableIndex) / (b * b));
+  double Coefficient = 0.5;
+  FusionCost = Coefficient * (MyValue()  - abs(MyValue() - MyMatrix->Value(NextAvailableIndex, NextAvailableIndex)) + MyMatrix->Value(NextAvailableIndex, NextAvailableIndex));
 }
 
 bool FusionnedClasses::Exist()
@@ -110,22 +108,11 @@ bool FusionnedClasses::Exist()
   return MyIndex == MyAvailableIndex;
 }
 
-int FusionnedClasses::MyCardinal() const
-{
-  return NbFusions + 1;
-  /*assert(MyIndex == MyAvailableIndex);
-  if (NextAvailableIndex == -1)
-    return MyMatrix->p - MyAvailableIndex;
-  return NextAvailableIndex - MyAvailableIndex;
-   */
-}
-
 std::ostream &operator<<(std::ostream &s, const FusionnedClasses &C)
 {
     // s << "(" << &C << "-> ";
   s << "WhoIAm = " << C.WhoIAm;
   // s << C.WhoIAm;
-  s << "MyCardinal = " << C.MyCardinal() << ", ";
   s << "MyIndex = " << C.MyIndex << ", ";
   s << "FusionCost = " << C.FusionCost << ", ";
   s << "MyAvailableIndex = " << C.MyAvailableIndex << ", ";
@@ -144,4 +131,6 @@ bool operator<(const FusionnedClasses &Left, const FusionnedClasses &Right)
     return (Left.MyAvailableIndex < Right.MyAvailableIndex);
   return (Left.FusionCost < Right.FusionCost);
 }
+
+
 
