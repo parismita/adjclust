@@ -22,7 +22,6 @@ class ClassesHeap;
 class FusionnedClasses
 {
 public: 
-  int NbFusions;
   double MyValue() const; // somme des elements diagonaux de la classe
   double FusionCost;
   int MyIndex;  // indice (absolu) du premier element de la classe: ne change jamais
