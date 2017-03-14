@@ -11,10 +11,11 @@
 #include "ClassesHeap.h"
 #include <string>
 #include <sstream>
-
+//#include <cmath> 
 #include <iostream>
 
 
+using namespace std;
 /* (default is ok (no allocation is ever made).
 FusionnedClasses::~FusionnedClasses() TrucTruc
 {
@@ -24,7 +25,6 @@ FusionnedClasses::~FusionnedClasses() TrucTruc
  
 FusionnedClasses::FusionnedClasses()
 {
-  NbFusions = 0;
   FusionCost = -1;
   MyIndex = -1;
   MyAvailableIndex = -1;
@@ -63,7 +63,7 @@ void FusionnedClasses::InitializeFusionCost()
     {
       //as ai = aj = 0.5 and beta = 0 and gamma = -0.5
       double Coefficient = 0.5;
-      FusionCost = Coefficient * [MyMatrix->Value(MyIndex, MyIndex) +  MyMatrix->Value(MyIndex + 1, MyIndex + 1) - abs(MyMatrix->Value(MyIndex, MyIndex) -  MyMatrix->Value(MyIndex + 1, MyIndex + 1))];
+      FusionCost = Coefficient * (MyMatrix->Value(MyIndex, MyIndex) +  MyMatrix->Value(MyIndex + 1, MyIndex + 1) - abs(MyMatrix->Value(MyIndex, MyIndex) -  MyMatrix->Value(MyIndex + 1, MyIndex + 1)));
     }
 }
 
@@ -78,7 +78,6 @@ void FusionnedClasses::Swallow(int &NumFusionnedClass)
   assert(MyAvailableIndex == MyIndex);
   assert(NextAvailableIndex > -1);
   FusionnedClasses *Next = (MyMatrix->MyClasses) + NextAvailableIndex;
-  NbFusions += 1 + Next->NbFusions;
   Next->MyAvailableIndex = MyIndex;
   NextAvailableIndex = Next->NextAvailableIndex;
   if (NextAvailableIndex > -1)
@@ -118,7 +117,6 @@ std::ostream &operator<<(std::ostream &s, const FusionnedClasses &C)
   s << "MyAvailableIndex = " << C.MyAvailableIndex << ", ";
   s << "NextAvailableIndex = " << C.NextAvailableIndex << ", ";
   s << "MyValue = " << C.MyValue() << ", ";
-  s << "NbFusions = " << C.NbFusions << ", ";
   s << "MyMatrix = " << C.MyMatrix << ".";
   s << ")  ";
   return s; 
