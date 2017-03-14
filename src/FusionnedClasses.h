@@ -43,7 +43,6 @@ public:
   bool Exist();
   void DisplayMatrixA();
     // ~FusionnedClasses();
-  int MyCardinal() const;
   void ComputeMyFusionCost();
   void InitializeFusionCost();
   
