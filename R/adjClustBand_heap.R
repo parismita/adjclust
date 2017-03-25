@@ -1,18 +1,19 @@
+#' @importFrom matrixStats rowCumsums
+#' @importFrom matrixStats colCumsums
 adjClustBand_heap <- function(x, p, h, blMin=1, verbose=FALSE){
     len <- length(x)
     stopifnot(len==(p-1)*h-h*(h-1)/2)
     xt <- transpose(x, p, h)
 
     ## sum of the "rectangles" beginning from the left
+    ## dissim taken in left matrix as we take upper triangle of sparsed matrix
+    ## dissim in matR gives mirror image of required output
     matL <- .toMatLeft(xt, p, h)     ## a matrix p x h (with zeros at the bottom) of the LD values
-    rCumL <- rowCumsums(matL)         ## p x h matrix
-    rcCumL <- colCumsums(rCumL)        ## p x h matrix
+    dissim <- as.numeric(1 - matL)    ## cosine distance metric
 
     ## sum of the "rectangles" beginning from the right
     matR <- .toMatRight(x, p, h)
     rotatedMatR <- .rotate(.rotate(matR))  ## WTF ??
-    rCumR <- rowCumsums(rotatedMatR)  ## p x h matrix
-    rcCumR <- colCumsums(rCumR)  ## p x h matrix
 
     rm(x, xt)
 
@@ -51,7 +52,7 @@ adjClustBand_heap <- function(x, p, h, blMin=1, verbose=FALSE){
     chainedL[8,p-1] <- -1
     heap <- buildHeap(heap, D, lHeap)
 
-    res <- .Call("cWardHeaps", rcCumR, rcCumL, as.integer(h), as.integer(p), chainedL, heap, D, as.integer(lHeap), merge, gains, traceW, as.integer(blMin), PACKAGE="adjclust")
+    res <- .Call("cWardHeaps", dissim, as.integer(h), as.integer(p), chainedL, heap, D, as.integer(lHeap), merge, gains, as.integer(blMin), PACKAGE="adjclust")
 
     height <- cumsum(gains)
     tree <- list(traceW=traceW,
@@ -67,3 +68,4 @@ adjClustBand_heap <- function(x, p, h, blMin=1, verbose=FALSE){
     class(tree) <- "hclust"
     return(tree)
 }
+
