@@ -18,11 +18,9 @@
 #define SIJ 11
 #define VALID 12
 
+#define DIS(i,j,p) dissim[p*(j-1)+i-1]
 #define CHAIN(i,j) chainedL[(12*(j-1)+i-1)]
-#define CUMR(i,j,p) rcCumRight[(p*(j-1)+i-1)]
-#define CUML(i,j,p) rcCumLeft[(p*(j-1)+i-1)]
 #define MERGE(i,j,k) merge[((*p-1)*(j-1)+i-1)]
-#define TRW(i,j,k) traceW[((*p-1)*(j-1)+i-1)]
 
 #define MIN(a,b) ((a) < (b) ? a : b)
 
@@ -206,30 +204,9 @@ int neiNeighborPos_C(int sense, int posMin, double *chainedL){
   return(pos);
 }
 
-double pencil_C(int sense, int lim, int hLoc, int p, double *rcCumRight, double *rcCumLeft){
-  double tot, sumPen=0;
-
-  tot = CUML(p, hLoc, p);
-  if (sense==-1){
-    if (lim==p){
-      sumPen = tot;
-    } else {
-      sumPen = tot - CUMR(p-lim, hLoc, p);
-    }
-  }
-  else {
-    if (lim==1){
-      sumPen = tot;
-    } else {
-      sumPen = tot - CUML(lim-1, hLoc, p);
-    }
-  }
-  return(sumPen);
-}
-
-double* distance_C(int mini, int maxi, int minj, int maxj, double *rcCumRight, double *rcCumLeft, int h, int p){
-  double *res = malloc(sizeof(double)*4);
-  double Sii, Sjj, Sij, D;
+double distance_C(int mini, int maxi, int minj, int maxj, double *dissim, int h, int p){
+  double res = INT_MAX;
+  int i=0;
   int ni, nj, mI, mJ, mIJ;
 
   ni = maxi - mini + 1;
@@ -238,51 +215,39 @@ double* distance_C(int mini, int maxi, int minj, int maxj, double *rcCumRight, d
   mJ = nj - 1;
   mIJ = maxj - mini;
 
-  if ((ni==1) & (nj==1)){
-    Sii = 1;
-    Sjj = 1;
-  }
-  else if ((ni==1) & (nj>1)){
-    Sii = 1;
-    Sjj = 2*pencil_C(1, minj, MIN(h, mJ), p, rcCumRight, rcCumLeft) + 2*pencil_C(-1, maxj, MIN(h, mJ), p, rcCumRight, rcCumLeft) - 2*CUML(p, MIN(h, mJ), p)+ nj;
-  }
-  else if ((ni>1) & (nj==1)){
-    Sjj = 1;
-    Sii = 2*pencil_C(1, mini, MIN(h, mI), p, rcCumRight, rcCumLeft) + 2*pencil_C(-1, maxi, MIN(h, mI), p, rcCumRight, rcCumLeft) - 2*CUML(p, MIN(h, mI), p) + ni;
-  }
-  else {
-    Sii = 2*pencil_C(1, mini, MIN(h, mI), p, rcCumRight, rcCumLeft) + 2*pencil_C(-1, maxi, MIN(h, mI), p, rcCumRight, rcCumLeft) - 2*CUML(p, MIN(h, mI), p) + ni;
-    Sjj = 2*pencil_C(1, minj, MIN(h, mJ), p, rcCumRight, rcCumLeft) + 2*pencil_C(-1, maxj, MIN(h, mJ), p, rcCumRight, rcCumLeft) - 2*CUML(p, MIN(h, mJ), p) + nj;
+  // given with 2 clusters we have to find min dist.
+//max clust items = p, max diff in clust index = h
+//time complexity worst case can be reduced to O(ph) as the distancematrix is not sorted and sorting would take O(plogh) time complexity
+// hence sequencial method preferred
+
+//traverse dissim from (mini,minj - mini) to (maxi,maxj-maxi) or (maxi,h) and find min dissim.
+//time comp O(p*h) worst case
+  for(int i=mini;i<=maxi;i++)
+  {
+    for(int j=minj-i;(j<=maxj-i)&&(j<=h);j++)
+    {   
+    res = MIN(DIS(i,j,p),res);
+    }
   }
 
-  Sij = pencil_C(-1, maxj, MIN(h, mIJ), p, rcCumRight, rcCumLeft) + pencil_C(1, mini, MIN(h, mIJ), p, rcCumRight, rcCumLeft) - CUML(p, MIN(h, mIJ), p) - (Sii-ni)/2 - (Sjj-nj)/2;
 
-  D =  (float)ni*nj/(ni+nj)  * ( (float)1/(ni*ni)*Sii + (float)1/(nj*nj)*Sjj - (float)2/(ni*nj)*Sij ) ;
-
-  res[0] = D;
-  res[1] = Sii;
-  res[2] = Sjj;
-  res[3] = Sij;
-
-  return res;
+return res;
 }
 
-SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP RchainedL, SEXP Rpositions, SEXP Rdistances, SEXP RlHeap, SEXP Rmerge, SEXP Rgains, SEXP RtraceW, SEXP RblMin){
+SEXP cWardHeaps(SEXP Rdissim, SEXP Rh, SEXP Rp, SEXP RchainedL, SEXP Rpositions, SEXP Rdistances, SEXP RlHeap, SEXP Rmerge, SEXP Rgains, SEXP RblMin){
 
   int *h, *p, *positions, *lHeap, *merge, *neiL, *neiR, *blMin;
   int posMin, neineiL, neineiR, k;
-  double *rcCumRight, *rcCumLeft, *distances, *chainedL, *gains, *traceW, *d1, *d2, *dLast, newDR, newDL, sumSdiag, snew, nii, njj, clMin_11, clMin_12, clMin_21, clMin_22;
+  double *distances, *chainedL, *gains, d1, d2, dLast, newDR, newDL, clMin_11, clMin_12, clMin_21, clMin_22;
   int jj, step, stepInv;
+  double *dissim;
 
   Rpositions = PROTECT(coerceVector(Rpositions, INTSXP));
   Rmerge = PROTECT(coerceVector(Rmerge, INTSXP));  // matrix
   Rgains = PROTECT(coerceVector(Rgains, REALSXP));  // vector
   Rdistances = PROTECT(coerceVector(Rdistances, REALSXP));
   RchainedL = PROTECT(coerceVector(RchainedL, REALSXP));
-  RtraceW = PROTECT(coerceVector(RtraceW, REALSXP));
-
-  rcCumRight = REAL(RrcCumRight);
-  rcCumLeft = REAL(RrcCumLeft);
+  dissim = REAL(Rdissim);
   h = INTEGER(Rh);
   p = INTEGER(Rp);
   chainedL = REAL(RchainedL);
@@ -291,13 +256,11 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
   lHeap = INTEGER(RlHeap);
   merge = INTEGER(Rmerge);
   gains = REAL(Rgains);
-  traceW = REAL(RtraceW);
   blMin = INTEGER(RblMin);
 
   k = *p - *blMin;
 
   jj = *p;
-  sumSdiag = *p;
 
   for ( step=1; step < (*p-1); step=step+1 ){
     while(CHAIN(VALID, positions[0])==0){
@@ -324,8 +287,8 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
 
 
     if (clMin_11==1){
-      d1 = distance_C(clMin_11, clMin_22, neiR[1], neiR[2], rcCumRight, rcCumLeft, *h, *p);
-      newDR = d1[0];
+      d1 = distance_C(clMin_11, clMin_22, neiR[1], neiR[2], dissim, *h, *p);
+      newDR = d1;
       CHAIN(MINCL1, jj) = CHAIN(MINCL1, posMin);
       CHAIN(MAXCL1, jj) = CHAIN(MAXCL2, posMin);
       CHAIN(MINCL2, jj) = neiR[1];
@@ -334,9 +297,6 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
       CHAIN(LAB2, jj) = neiR[3];
       CHAIN(POSL, jj) = -1;
       CHAIN(POSR, jj) = neineiR;
-      CHAIN(SII, jj) = d1[1];
-      CHAIN(SJJ, jj) = d1[2];
-      CHAIN(SIJ, jj) = d1[3];
       CHAIN(VALID, jj) = 1;
       if (neineiR>0){
     	CHAIN(POSL, neineiR) = jj;
@@ -349,8 +309,8 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
       jj = jj+1;
     }
     else if (clMin_22==*p){
-      d2 = distance_C(neiL[1], neiL[2], clMin_11, clMin_22, rcCumRight, rcCumLeft, *h, *p);
-      newDL = d2[0] ;
+      d2 = distance_C(neiL[1], neiL[2], clMin_11, clMin_22, dissim, *h, *p);
+      newDL = d2 ;
       CHAIN(MINCL1, jj) = neiL[1];
       CHAIN(MAXCL1, jj) = neiL[2];
       CHAIN(MINCL2, jj) = CHAIN(MINCL1, posMin);
@@ -359,9 +319,6 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
       CHAIN(LAB2, jj) = step;
       CHAIN(POSL, jj) = neineiL;
       CHAIN(POSR, jj) = -1;
-      CHAIN(SII, jj) = d2[1];
-      CHAIN(SJJ, jj) = d2[2];
-      CHAIN(SIJ, jj) = d2[3];
       CHAIN(VALID, jj) = 1;
       if (neineiL>0){
     	CHAIN(POSR, neineiL) = jj;
@@ -374,10 +331,10 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
       jj = jj+1;
     }
     else {
-      d2 = distance_C(clMin_11, clMin_22, neiR[1], neiR[2], rcCumRight, rcCumLeft, *h, *p);
-      d1 = distance_C(neiL[1], neiL[2], clMin_11, clMin_22, rcCumRight, rcCumLeft, *h, *p);
-      newDR = d2[0];
-      newDL = d1[0];
+      d2 = distance_C(clMin_11, clMin_22, neiR[1], neiR[2], dissim, *h, *p);
+      d1 = distance_C(neiL[1], neiL[2], clMin_11, clMin_22, dissim, *h, *p);
+      newDR = d2;
+      newDL = d1;
       CHAIN(MINCL1, jj) = neiL[1];
       CHAIN(MAXCL1, jj) = neiL[2];
       CHAIN(MINCL2, jj) = CHAIN(MINCL1, posMin);
@@ -386,9 +343,7 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
       CHAIN(LAB2, jj) = step;
       CHAIN(POSL, jj) = neineiL;
       CHAIN(POSR, jj) = jj+1;
-      CHAIN(SII, jj) = d1[1];
-      CHAIN(SJJ, jj) = d1[2];
-      CHAIN(SIJ, jj) = d1[3];
+
       CHAIN(VALID, jj) = 1;
       CHAIN(MINCL1, jj+1) = CHAIN(MINCL1, posMin);
       CHAIN(MAXCL1, jj+1) = CHAIN(MAXCL2, posMin);
@@ -398,9 +353,7 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
       CHAIN(LAB2, jj+1) = neiR[3];
       CHAIN(POSL, jj+1) = jj;
       CHAIN(POSR, jj+1) = neineiR;
-      CHAIN(SII, jj+1) = d2[1];
-      CHAIN(SJJ, jj+1) = d2[2];
-      CHAIN(SIJ, jj+1) = d2[3];
+
       CHAIN(VALID, jj+1) = 1;
       if (neineiL>0){
      	CHAIN(POSR, neineiL) = jj;
@@ -419,33 +372,24 @@ SEXP cWardHeaps(SEXP RrcCumRight, SEXP RrcCumLeft, SEXP Rh, SEXP Rp, SEXP Rchain
      *lHeap = *lHeap + 1;
      jj = jj+2;
     }
-    // update of sumSdiag
-    nii = CHAIN(MAXCL1, posMin) - CHAIN(MINCL1, posMin) + 1;
-    njj = CHAIN(MAXCL2, posMin) - CHAIN(MINCL2, posMin) + 1;
-    snew = CHAIN(SII, posMin) + CHAIN(SJJ, posMin) + (float)2*CHAIN(SIJ, posMin);
-    sumSdiag = sumSdiag - CHAIN(SII, posMin)/nii - CHAIN(SJJ, posMin)/njj + snew/(nii+njj);
 
     stepInv = *p - step;
     MERGE(step, 1, k) = CHAIN(LAB1, posMin);
     MERGE(step, 2, k) = CHAIN(LAB2, posMin);
-    TRW(stepInv, 1, k) = stepInv;
-    TRW(stepInv, 2, k) = *p - (float)sumSdiag;
   }
 
   // merging the remaining two classes
   step = *p-1;
-  stepInv = 1;
   posMin = jj-1;
 
-  dLast = distance_C(CHAIN(MINCL1, posMin), CHAIN(MAXCL1, posMin), CHAIN(MINCL2, posMin), CHAIN(MAXCL2, posMin), rcCumRight, rcCumLeft, *h, *p);
-  sumSdiag = dLast[1] + dLast[2] + (float)2*dLast[3];
+  dLast = distance_C(CHAIN(MINCL1, posMin), CHAIN(MAXCL1, posMin), CHAIN(MINCL2, posMin), CHAIN(MAXCL2, posMin), dissim, *h, *p);
 
-  gains[step-1] = dLast[0];
+
+  gains[step-1] = dLast;
   MERGE(step, 1, k) = CHAIN(LAB1, jj-1);
   MERGE(step, 2, k) = CHAIN(LAB2, jj-1);
-  TRW(stepInv, 1, k) = stepInv;
-  TRW(stepInv, 2, k) = *p - (float)sumSdiag/(*p) ;
 
   UNPROTECT(6);
   return(Rmerge);
 }
+
